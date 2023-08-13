@@ -1,0 +1,82 @@
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    android:background="#4A235A">
+
+    <Button
+        android:id="@+id/btn_send_contact"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:text="Añadir Contacto"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:backgroundTint="#3498db" />
+
+    <EditText
+        android:id="@+id/et_new_contact"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Añade un nombre de usuario"
+        android:layout_toStartOf="@id/btn_send_contact"
+        android:layout_marginBottom="16dp"
+        android:textSize="15sp"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#FFFFFF"/>
+
+    <EditText
+        android:id="@+id/et_remove_contact"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Elimina un nombre de usuario"
+        android:layout_toStartOf="@id/btn_send_contact"
+        android:layout_marginTop="23dp"
+        android:layout_marginBottom="16dp"
+        android:textSize="15sp"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#FFFFFF"
+        android:layout_below="@id/btn_send_contact"/>
+
+    <Button
+        android:id="@+id/btn_delete_contact"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignTop="@id/et_remove_contact"
+        android:layout_marginStart="3dp"
+        android:layout_marginTop="-7dp"
+        android:layout_toEndOf="@id/et_remove_contact"
+        android:backgroundTint="#e74c3c"
+        android:text="Eliminar Contacto"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/tv_destinatario"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@android:color/white"
+        android:textSize="18sp"
+        android:layout_below="@id/btn_send_contact"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="86dp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/tv_destinatario"
+        android:layout_marginTop="8dp">
+
+        <LinearLayout
+            android:id="@+id/chat_list_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</RelativeLayout>

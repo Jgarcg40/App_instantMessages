@@ -1,0 +1,11 @@
+<resources>
+    <style name="Base.Theme.Messages_app" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Fondo negro para la ventana de la aplicación en modo nocturno -->
+        <item name="android:windowBackground">@android:color/black</item>
+        <!-- Color de texto blanco en modo nocturno -->
+        <item name="android:textColor">@android:color/white</item>
+        <!-- Puedes agregar otros atributos de estilo aquí si lo deseas -->
+    </style>
+
+    <style name="Theme.Messages_app" parent="Base.Theme.Messages_app" />
+</resources>

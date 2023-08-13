@@ -1,0 +1,59 @@
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    android:background="#4A235A">
+
+    <TextView
+        android:id="@+id/tv_destinatario"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#13fc03"
+        android:textSize="30sp"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="16dp" />
+
+
+    <ScrollView
+        android:id="@+id/scroll_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/tv_destinatario"
+        android:layout_marginBottom="64dp"
+        android:layout_marginTop="20dp">
+
+        <TextView
+            android:id="@+id/tv_mensajes"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@android:color/white"
+            android:textSize="18sp" />
+    </ScrollView>
+
+    <EditText
+        android:id="@+id/et_mensaje"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:hint="Ingrese el mensaje"
+        android:minHeight="48dp"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#FFFFFF"/>
+
+
+    <Button
+        android:id="@+id/btn_enviar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentBottom="true"
+        android:layout_marginEnd="0dp"
+        android:layout_marginBottom="5dp"
+        android:backgroundTint="@color/colorAzul"
+        android:text="Enviar" />
+
+</RelativeLayout>
+
+
+
