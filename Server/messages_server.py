@@ -10,6 +10,9 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import messaging
 from dbutils.pooled_db import PooledDB
+import hashlib
+import os
+
 
 
 # Crear un pool de conexiones
@@ -17,15 +20,15 @@ pool = PooledDB(
     creator=mariadb,
     host='pon tu ip publica o host aqui',
     port=3306,
-    user='pon tu usuario',
-    password='pon tu contraseña',
-    database='pon el nombre de tu base de datos',
+    user='pon tu usuario de la BBDD',
+    password='pon tu contraseña de la BBDD',
+    database='Pon el nombre de tu BBDD',
     mincached=1,
     maxcached=10,
 )
 
 # Ruta al archivo JSON de la cuenta de servicio
-cred = credentials.Certificate(r'pon la direccion de tu archivo de credenciales de firebase')
+cred = credentials.Certificate(r'Añade la direccion en tu disco de tu archivo de certificado de firebase')
 firebase_admin.initialize_app(cred)
 
 # Diccionario para rastrear conexiones activas de clientes
@@ -33,6 +36,18 @@ active_clients = {}
 
 # Cola para almacenar mensajes pendientes
 message_queue = queue.Queue()
+
+
+def cifrar_contrasena(contrasena):
+    # Generar una salt aleatoria
+    salt = os.urandom(16)
+
+    # Combina la contraseña con la salt y calcula el hash
+    contrasena_con_salt = salt + contrasena.encode()
+    hashed_contrasena = hashlib.sha256(contrasena_con_salt).hexdigest()
+
+    return salt, hashed_contrasena
+
 
 def obtener_token_por_usuario(nombre_usuario):
     conn = None  # Asignar None antes del bloque try
@@ -123,6 +138,9 @@ def registrar_usuario(nombre, apellido1, apellido2, nombre_usuario, email, contr
         print(f"Error al conectar a la base de datos: {e}")
         return False
 
+    salt, contrasena_cifrada = cifrar_contrasena(contrasena)
+    salt_hex = salt.hex()
+
     cursor = conn.cursor()
 
     try:
@@ -136,8 +154,8 @@ def registrar_usuario(nombre, apellido1, apellido2, nombre_usuario, email, contr
 
         # Insertar el nuevo usuario en la base de datos
         cursor.execute(
-            'INSERT INTO usuarios (nombre, apellido1, apellido2, nombre_usuario, email, contraseña) VALUES (%s, %s, %s, %s, %s, %s)',
-            (nombre, apellido1, apellido2, nombre_usuario, email, contrasena))
+            'INSERT INTO usuarios (nombre, apellido1, apellido2, nombre_usuario, email, contraseña, salt) VALUES (%s, %s, %s, %s, %s, %s, %s)',
+            (nombre, apellido1, apellido2, nombre_usuario, email, contrasena_cifrada, salt_hex))
         conn.commit()
 
         return True
@@ -148,6 +166,8 @@ def registrar_usuario(nombre, apellido1, apellido2, nombre_usuario, email, contr
     finally:
         if conn:
             conn.close()
+
+
 def verificar_credenciales(nombre_usuario, contrasena):
     conn = None
     try:
@@ -158,17 +178,29 @@ def verificar_credenciales(nombre_usuario, contrasena):
         cursor = conn.cursor()
 
         # Consulta SQL para verificar las credenciales
-        query = "SELECT COUNT(*) FROM usuarios WHERE nombre_usuario = ? AND contraseña = ?"
-        cursor.execute(query, (nombre_usuario, contrasena))
+        query = "SELECT contraseña, salt FROM usuarios WHERE nombre_usuario = ?"
+        cursor.execute(query, (nombre_usuario,))
 
         # Obtener el resultado de la consulta
         result = cursor.fetchone()
 
-        # Cerrar la conexión con la base de datos
-        conn.close()
 
-        # El resultado es un número que indica si las credenciales coinciden o no
-        return result[0] == 1
+        if result:
+            # Obtener la contraseña cifrada y la salt almacenada
+            contraseña_cifrada = result[0]
+            salt_hex = result[1]  # Ya es una cadena
+            salt = bytes.fromhex(salt_hex)
+
+
+            # Calcular el hash de la contraseña proporcionada con la salt almacenada
+            contraseña_con_salt = salt + contrasena.encode()
+            hashed_contraseña = hashlib.sha256(contraseña_con_salt).hexdigest()
+
+            # Comparar el hash calculado con el hash almacenado
+            return contraseña_cifrada == hashed_contraseña
+        else:
+            return False
+
     except mariadb.Error as e:
         print(f"Error al conectar a la base de datos: {e}")
         return False
@@ -328,16 +360,16 @@ def handle_client(client_socket, client_address):
 
 
 server_host = '0.0.0.0'
-server_port = 12345#abre este puerto
+server_port = 12345 #puedes poner el que quieras que tengas abierto
 
 # Crear una conexión a la base de datos
 try:
     conn = mariadb.connect(
-        user='pon tu usuario',
-        password='pon tu contraseña',
-        host='pon tu ip publica o host',
+        user='Pon el usuario de tu BBDD',
+        password='Pon la contraseña de la BBDD',
+        host='Pon tu ip publica o host',
         port=3306,
-        database='pon el nombre de tu base de datos',
+        database='Pon el nombre de tu BBDD',
         connect_timeout= 31536000 #timeout largo (1año)
     )
     print("Conexión a la base de datos MariaDB exitosa.")
@@ -358,6 +390,7 @@ cursor.execute('''
     nombre_usuario VARCHAR(255) UNIQUE,
     email VARCHAR(255) UNIQUE,
     contraseña VARCHAR(255),
+    salt VARCHAR(64),
     token VARCHAR(255) UNIQUE
 );
 ''')
