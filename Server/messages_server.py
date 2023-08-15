@@ -209,6 +209,11 @@ def verificar_credenciales(nombre_usuario, contrasena):
             conn.close()
 # Función para enviar un mensaje a un cliente
 def send_message(destinatario, message, remitente):
+        notification_title = f"Nuevo mensaje de {remitente}"
+        notification_body = "Tienes un nuevo mensaje mientras no estabas"
+        token_destinatario=obtener_token_por_usuario(destinatario)
+        print(token_destinatario)
+        send_notification_to_device(token_destinatario, notification_title, notification_body)
     if destinatario in active_clients:
         destinatario_socket = active_clients[destinatario]
         print(f"Enviando mensaje a {destinatario} en dirección IP {destinatario_socket.getpeername()}")
@@ -223,11 +228,6 @@ def send_message(destinatario, message, remitente):
             message_queue.put((destinatario, message))
     else:
 
-        notification_title = f"Nuevo mensaje de {remitente}"
-        notification_body = "Tienes un nuevo mensaje mientras no estabas"
-        token_destinatario=obtener_token_por_usuario(destinatario)
-        print(token_destinatario)
-        send_notification_to_device(token_destinatario, notification_title, notification_body)
         # Si el destinatario no está conectado, almacenar el mensaje en la cola
         print("Destinatario desconectado. Almacenando mensaje en la cola.")
         message_queue.put((destinatario, message,remitente))
