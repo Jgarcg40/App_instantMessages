@@ -66,7 +66,7 @@ def obtener_token_por_usuario(nombre_usuario):
 
         if resultado:
             token = resultado[0]
-            print(f"El token del usuario {nombre_usuario} es: {token}")
+            #print(f"El token del usuario {nombre_usuario} es: {token}")
             return token  # Retornar el token
         else:
             print(f"No se encontró un token para el usuario {nombre_usuario}")
@@ -99,9 +99,7 @@ def guardar_token_en_bd(token, nombre_usuario):
         if usuario_existente:
             consulta_actualizacion = "UPDATE usuarios SET token = ? WHERE nombre_usuario = ?"
             cursor.execute(consulta_actualizacion, (token, nombre_usuario))
-        else:
-            consulta_insercion = "INSERT INTO usuarios (nombre_usuario, token) VALUES (?, ?)"
-            cursor.execute(consulta_insercion, (nombre_usuario, token))
+        
 
         # Confirmar los cambios en la base de datos
         conn.commit()
@@ -209,14 +207,15 @@ def verificar_credenciales(nombre_usuario, contrasena):
             conn.close()
 # Función para enviar un mensaje a un cliente
 def send_message(destinatario, message, remitente):
-        notification_title = f"Nuevo mensaje de {remitente}"
-        notification_body = "Tienes un nuevo mensaje mientras no estabas"
-        token_destinatario=obtener_token_por_usuario(destinatario)
-        print(token_destinatario)
-        send_notification_to_device(token_destinatario, notification_title, notification_body)
+    notification_title = f"Nuevo mensaje de {remitente}"
+    notification_body = "Tienes un nuevo mensaje mientras no estabas"
+    token_destinatario = obtener_token_por_usuario(destinatario)
+    #print(token_destinatario)
+    send_notification_to_device(token_destinatario, notification_title, notification_body)
     if destinatario in active_clients:
         destinatario_socket = active_clients[destinatario]
         print(f"Enviando mensaje a {destinatario} en dirección IP {destinatario_socket.getpeername()}")
+
         try:
             message_with_date = f"Mensaje enviado el día: {datetime.now().strftime('%Y-%m-%d')} a las: {datetime.now().strftime('%H:%M')} por {message}"
             destinatario_socket.send(message_with_date.encode())
@@ -227,6 +226,8 @@ def send_message(destinatario, message, remitente):
             print("Volviendo a encolar el mensaje.")
             message_queue.put((destinatario, message))
     else:
+
+
 
         # Si el destinatario no está conectado, almacenar el mensaje en la cola
         print("Destinatario desconectado. Almacenando mensaje en la cola.")
@@ -260,107 +261,113 @@ def process_message_queue():
 message_thread = threading.Thread(target=process_message_queue)
 message_thread.start()
 def handle_client(client_socket, client_address):
-    
     try:
-        print(f"Conexión establecida desde {client_address}")
+        print(f"Conexión establecida desde {client_address} el día: {datetime.now().strftime('%Y-%m-%d')} a las: {datetime.now().strftime('%H:%M')}")
         nombre_usuario = None  # Inicializar la variable nombre_usuario
 
-        # Recibir la solicitud del cliente
-        data = client_socket.recv(1024).decode().strip()
-        token, data = data.split("|")
-        token = token.rstrip()
-        print(f"token: {token}")
-        print(f"Solicitud recibida: {data}")
-        if data.startswith("REGISTRAR:"):
-            # Manejar la solicitud de registro
-            _, nombre, apellido1, apellido2, nuevo_usuario, email, nueva_contrasena = data.split(":")
-            print(f"Solicitud de registro recibida: {nombre}, {apellido1}, {apellido2}, {nuevo_usuario}, {email}, {nueva_contrasena}")
-            registro_exitoso = registrar_usuario(nombre, apellido1, apellido2, nuevo_usuario, email, nueva_contrasena)
-            print(registro_exitoso)
-            if registro_exitoso:
-                client_socket.send(b"OK")
+        try:
+            # Recibir la solicitud del cliente
+            data = client_socket.recv(1024).decode().strip()
+            token, data = data.split("|")
+            token = token.rstrip()
+            print(f"Solicitud recibida: {data}")
+
+            if data.startswith("REGISTRAR:"):
+                # Manejar la solicitud de registro
+                _, nombre, apellido1, apellido2, nuevo_usuario, email, nueva_contrasena = data.split(":")
+                print(f"Solicitud de registro recibida: {nombre}, {apellido1}, {apellido2}, {nuevo_usuario}, {email}, {nueva_contrasena}")
+                registro_exitoso = registrar_usuario(nombre, apellido1, apellido2, nuevo_usuario, email, nueva_contrasena)
+                print(registro_exitoso)
+                if registro_exitoso:
+                    client_socket.send(b"OK")
+                else:
+                    client_socket.send(b"ERROR")
+
             else:
-                client_socket.send(b"ERROR")
+                # Verificar las credenciales del cliente en la base de datos
+                contrasena, nombre_usuario = data.split(";")
+                nombre_usuario = nombre_usuario.rstrip()
+                contrasena = contrasena.rstrip()
 
-        else:
-            # Verificar las credenciales del cliente en la base de datos
-            contrasena, nombre_usuario = data.split(";")
-            nombre_usuario = nombre_usuario.rstrip()
-            contrasena = contrasena.rstrip()
-            if token == "null":
-                print("El token es null, no se guardará en la base de datos")
-            else:
-                guardar_token_en_bd(token, nombre_usuario)
-                print("Token guardado en la base de datos")
+                if token == "null":
+                    print("El token es null, no se guardará en la base de datos")
+                else:
+                    guardar_token_en_bd(token, nombre_usuario)
+                    print("Token guardado en la base de datos")
 
-            print(f"Nombre de usuario y contraseña recibido: {nombre_usuario}, {contrasena}")
-            credenciales_correctas = verificar_credenciales(nombre_usuario, contrasena)
-            print(credenciales_correctas)
+                print(f"Nombre de usuario y contraseña recibido: {nombre_usuario}, {contrasena}")
+                credenciales_correctas = verificar_credenciales(nombre_usuario, contrasena)
+                print(credenciales_correctas)
 
-            # Enviar el resultado de verificación de credenciales al cliente
-            if credenciales_correctas:
-                client_socket.send(b"OK")
-            else:
-                client_socket.send(b"ERROR")
+                if credenciales_correctas:
+                    client_socket.send(b"OK")
+                else:
+                    client_socket.send(b"ERROR")
 
-        if nombre_usuario is not None:
-            add_active_client(nombre_usuario, client_socket)
+            if nombre_usuario is not None:
+                add_active_client(nombre_usuario, client_socket)
 
-        while True:
-            try:
-                # Utilizar select para monitorear los sockets para lectura, escritura y errores
-                read_sockets, _, _ = select.select([client_socket], [], [], 1)
+            while True:
+                try:
+                    # Utilizar select para monitorear los sockets para lectura, escritura y errores
+                    read_sockets, _, _ = select.select([client_socket], [], [], 1)
 
-                if client_socket in read_sockets:
-                    # Decodificar los datos recibidos
-                    data = client_socket.recv(1024)
-                    if not data:
-                        break
+                    if client_socket in read_sockets:
+                        # Decodificar los datos recibidos
+                        data = client_socket.recv(1024)
+                        if not data:
+                            break
 
-                    # Obtener el nombre de usuario del cliente a partir del mensaje recibido
-                    message = data.decode()
-                    remitente, destinatario, mensaje = message.split("|")
-                    remitente = remitente.rstrip()
-                    destinatario = destinatario.rstrip()
-                    # Almacenar el mensaje en la base de datos (opcional, según tu necesidad)
-                    cursor.execute(
-                        'INSERT INTO mensajes (remitente_nombre_usuario, destinatario_nombre_usuario, mensaje) VALUES (?, ?, ?)',
-                        (remitente, destinatario, mensaje))
-                    conn.commit()
+                        message = data.decode()
+                        remitente, destinatario, mensaje = message.split("|")
+                        remitente = remitente.rstrip()
+                        destinatario = destinatario.rstrip()
 
-                    # Imprimir el mensaje recibido
-                    print(f"Mensaje de {remitente} a {destinatario}: {mensaje}")
+                        cursor.execute(
+                            'INSERT INTO mensajes (remitente_nombre_usuario, destinatario_nombre_usuario, mensaje) VALUES (?, ?, ?)',
+                            (remitente, destinatario, mensaje))
+                        conn.commit()
 
-                    send_message(destinatario, message, remitente)
+                        print(f"Mensaje de {remitente} a {destinatario}: {mensaje}")
 
-            except Exception as e:
-                print(f"Error en el manejo de mensajes del cliente: {e}")
-                break
+                        send_message(destinatario, message, remitente)
 
-        while not message_queue.empty():
-            destinatario, message, remitente = message_queue.get()
-            if destinatario == nombre_usuario:
-                message_queue.task_done()  # Marcar el mensaje como procesado
-                print(f"QUEUE:Enviando mensaje pendiente a {destinatario}")
-                time.sleep(7)
-                message_ = f"(¡¡Mensaje enviado cuando estabas desconectado!!) - {message}"
+                except Exception as e:
+                    print(f"Error en el manejo de mensajes del cliente: {e}")
+                    break
 
-                send_message(destinatario, message_,remitente)
-            else:
-                message_queue.put((destinatario, message, remitente))  # Volver a encolar el mensaje para otros destinatarios
+            while not message_queue.empty():
+                destinatario, message, remitente = message_queue.get()
+                if destinatario == nombre_usuario:
+                    message_queue.task_done()
+                    print(f"QUEUE: Enviando mensaje pendiente a {destinatario}")
+                    time.sleep(7)
+                    message_ = f"(¡¡Mensaje enviado cuando estabas desconectado!!) - {message}"
+
+                    send_message(destinatario, message_, remitente)
+                else:
+                    message_queue.put((destinatario, message, remitente))
+
+        except ConnectionResetError as cre:
+            print(f"Error de conexión con el cliente {client_address}: {cre}")
+        except UnicodeDecodeError as ude:
+            print(f"Error de decodificación de datos del cliente {client_address}: {ude}")
+        except ValueError as ve:
+            print(f"Error al procesar los datos del cliente {client_address}: {ve}")
+        except Exception as e:
+            print(f"Error en el manejo del cliente {client_address}: {e}")
 
     finally:
-
         if nombre_usuario is not None:
-            print(nombre_usuario)
             remove_active_client(nombre_usuario)
         if client_socket:
-            print("conexión cerrada")
+            print("Conexión cerrada")
             client_socket.close()
 
 
+
 server_host = '0.0.0.0'
-server_port = 12345 #puedes poner el que quieras que tengas abierto
+server_port = 12345
 
 # Crear una conexión a la base de datos
 try:
