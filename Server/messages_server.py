@@ -262,6 +262,7 @@ message_thread = threading.Thread(target=process_message_queue)
 message_thread.start()
 def handle_client(client_socket, client_address):
     try:
+        #nota: si ves conexiones que desconoces conectandose a tu server probablemente sean escaneos de puertos abiertos.
         print(f"Conexión establecida desde {client_address} el día: {datetime.now().strftime('%Y-%m-%d')} a las: {datetime.now().strftime('%H:%M')}")
         nombre_usuario = None  # Inicializar la variable nombre_usuario
 
