@@ -287,8 +287,8 @@ def handle_client(client_socket, client_address):
             else:
                 # Verificar las credenciales del cliente en la base de datos
                 contrasena, nombre_usuario = data.split(";")
-                nombre_usuario = nombre_usuario.rstrip()
-                contrasena = contrasena.rstrip()
+                nombre_usuario = nombre_usuario.rstrip().lower()
+                contrasena = contrasena.rstrip().lower()
 
                 if token == "null":
                     print("El token es null, no se guardará en la base de datos")
@@ -321,8 +321,8 @@ def handle_client(client_socket, client_address):
 
                         message = data.decode()
                         remitente, destinatario, mensaje = message.split("|")
-                        remitente = remitente.rstrip()
-                        destinatario = destinatario.rstrip()
+                        remitente = remitente.rstrip().lower()
+                        destinatario = destinatario.rstrip().lower()
 
                         cursor.execute(
                             'INSERT INTO mensajes (remitente_nombre_usuario, destinatario_nombre_usuario, mensaje) VALUES (?, ?, ?)',
