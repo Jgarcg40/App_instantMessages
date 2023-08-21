@@ -14,7 +14,6 @@ import hashlib
 import os
 
 
-
 # Crear un pool de conexiones
 pool = PooledDB(
     creator=mariadb,
@@ -26,6 +25,16 @@ pool = PooledDB(
     mincached=1,
     maxcached=10,
 )
+
+def check_db_connection(connection):
+    try:
+        cursor = connection.cursor()
+        cursor.execute("SELECT 1")
+        cursor.close()
+        return True
+    except Exception as e:
+        print(f"Error en la conexión a la base de datos en la comprobacion para el envio y recepcion de mensages: {e}")
+        return False
 
 # Ruta al archivo JSON de la cuenta de servicio
 cred = credentials.Certificate(r'Añade la direccion en tu disco de tu archivo de certificado de firebase')
@@ -99,7 +108,7 @@ def guardar_token_en_bd(token, nombre_usuario):
         if usuario_existente:
             consulta_actualizacion = "UPDATE usuarios SET token = ? WHERE nombre_usuario = ?"
             cursor.execute(consulta_actualizacion, (token, nombre_usuario))
-        
+
 
         # Confirmar los cambios en la base de datos
         conn.commit()
@@ -261,8 +270,9 @@ def process_message_queue():
 message_thread = threading.Thread(target=process_message_queue)
 message_thread.start()
 def handle_client(client_socket, client_address):
+
+
     try:
-        #nota: si ves conexiones que desconoces conectandose a tu server probablemente sean escaneos de puertos abiertos.
         print(f"Conexión establecida desde {client_address} el día: {datetime.now().strftime('%Y-%m-%d')} a las: {datetime.now().strftime('%H:%M')}")
         nombre_usuario = None  # Inicializar la variable nombre_usuario
 
@@ -308,8 +318,19 @@ def handle_client(client_socket, client_address):
             if nombre_usuario is not None:
                 add_active_client(nombre_usuario, client_socket)
 
+
+
             while True:
                 try:
+                    conn = pool.connection()
+                    # Verifica y reconecta la conexión a la base de datos si es necesario
+                    if conn is None or not check_db_connection(conn):
+                        print("Reconectando a la base de datos...")
+                        if conn is not None:
+                            conn.close()
+                        conn = pool.connection()
+
+
                     # Utilizar select para monitorear los sockets para lectura, escritura y errores
                     read_sockets, _, _ = select.select([client_socket], [], [], 1)
 
@@ -333,9 +354,19 @@ def handle_client(client_socket, client_address):
 
                         send_message(destinatario, message, remitente)
 
-                except Exception as e:
-                    print(f"Error en el manejo de mensajes del cliente: {e}")
+                except ConnectionResetError as cre:
+                    print(f"Error de conexión con el cliente de envios y recepciones {client_address}: {cre}")
                     break
+                except UnicodeDecodeError as ude:
+                    print(f"Error de decodificación de datos del cliente de envios y recepciones{client_address}: {ude}")
+                    break
+                except ValueError as ve:
+                    print(f"Error al procesar los datos del cliente de envios y recepciones{client_address}: {ve}")
+                    break
+                except Exception as e:
+                    print(f"Error en el manejo de mensajes del cliente de envios y recepciones: {e}")
+                    break
+
 
             while not message_queue.empty():
                 destinatario, message, remitente = message_queue.get()
@@ -351,12 +382,20 @@ def handle_client(client_socket, client_address):
 
         except ConnectionResetError as cre:
             print(f"Error de conexión con el cliente {client_address}: {cre}")
+            client_socket.send("ERROR: Error de conexión.".encode("utf-8"))
+
         except UnicodeDecodeError as ude:
             print(f"Error de decodificación de datos del cliente {client_address}: {ude}")
+            client_socket.send("ERROR: Error de conexión.".encode("utf-8"))
+
         except ValueError as ve:
             print(f"Error al procesar los datos del cliente {client_address}: {ve}")
+            client_socket.send("ERROR: Error de conexión.".encode("utf-8"))
+
         except Exception as e:
             print(f"Error en el manejo del cliente {client_address}: {e}")
+            client_socket.send("ERROR: Error de conexión.".encode("utf-8"))
+
 
     finally:
         if nombre_usuario is not None:
@@ -370,20 +409,7 @@ def handle_client(client_socket, client_address):
 server_host = '0.0.0.0'
 server_port = 12345
 
-# Crear una conexión a la base de datos
-try:
-    conn = mariadb.connect(
-        user='Pon el usuario de tu BBDD',
-        password='Pon la contraseña de la BBDD',
-        host='Pon tu ip publica o host',
-        port=3306,
-        database='Pon el nombre de tu BBDD',
-        connect_timeout= 31536000 #timeout largo (1año)
-    )
-    print("Conexión a la base de datos MariaDB exitosa.")
-except mariadb.Error as e:
-    print(f"Error al conectar con la base de datos MariaDB: {e}")
-    exit(1)
+conn = pool.connection()
 
 # Crear el cursor para la base de datos
 cursor = conn.cursor()
