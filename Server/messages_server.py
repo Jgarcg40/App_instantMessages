@@ -13,8 +13,6 @@ from dbutils.pooled_db import PooledDB
 import hashlib
 import os
 
-
-# Crear un pool de conexiones
 pool = PooledDB(
     creator=mariadb,
     host='pon tu ip publica o host aqui',
@@ -26,19 +24,12 @@ pool = PooledDB(
     maxcached=10,
 )
 
-def check_db_connection(connection):
-    try:
-        cursor = connection.cursor()
-        cursor.execute("SELECT 1")
-        cursor.close()
-        return True
-    except Exception as e:
-        print(f"Error en la conexión a la base de datos en la comprobacion para el envio y recepcion de mensages: {e}")
-        return False
+
 
 # Ruta al archivo JSON de la cuenta de servicio
 cred = credentials.Certificate(r'Añade la direccion en tu disco de tu archivo de certificado de firebase')
 firebase_admin.initialize_app(cred)
+
 
 # Diccionario para rastrear conexiones activas de clientes
 active_clients = {}
@@ -75,7 +66,7 @@ def obtener_token_por_usuario(nombre_usuario):
 
         if resultado:
             token = resultado[0]
-            #print(f"El token del usuario {nombre_usuario} es: {token}")
+            # print(f"El token del usuario {nombre_usuario} es: {token}")
             return token  # Retornar el token
         else:
             print(f"No se encontró un token para el usuario {nombre_usuario}")
@@ -91,6 +82,8 @@ def obtener_token_por_usuario(nombre_usuario):
     finally:
         if conn:
             conn.close()
+
+
 def guardar_token_en_bd(token, nombre_usuario):
     conn = None  # Asignar None antes del bloque try
     try:
@@ -109,7 +102,6 @@ def guardar_token_en_bd(token, nombre_usuario):
             consulta_actualizacion = "UPDATE usuarios SET token = ? WHERE nombre_usuario = ?"
             cursor.execute(consulta_actualizacion, (token, nombre_usuario))
 
-
         # Confirmar los cambios en la base de datos
         conn.commit()
 
@@ -124,6 +116,7 @@ def guardar_token_en_bd(token, nombre_usuario):
 
         if conn:
             conn.close()
+
 
 def send_notification_to_device(token, title, body):
     message = messaging.Message(
@@ -191,13 +184,11 @@ def verificar_credenciales(nombre_usuario, contrasena):
         # Obtener el resultado de la consulta
         result = cursor.fetchone()
 
-
         if result:
             # Obtener la contraseña cifrada y la salt almacenada
             contraseña_cifrada = result[0]
             salt_hex = result[1]  # Ya es una cadena
             salt = bytes.fromhex(salt_hex)
-
 
             # Calcular el hash de la contraseña proporcionada con la salt almacenada
             contraseña_con_salt = salt + contrasena.encode()
@@ -214,12 +205,14 @@ def verificar_credenciales(nombre_usuario, contrasena):
     finally:
         if conn:
             conn.close()
+
+
 # Función para enviar un mensaje a un cliente
 def send_message(destinatario, message, remitente):
     notification_title = f"Nuevo mensaje de {remitente}"
     notification_body = "Tienes un nuevo mensaje mientras no estabas"
     token_destinatario = obtener_token_por_usuario(destinatario)
-    #print(token_destinatario)
+    # print(token_destinatario)
     send_notification_to_device(token_destinatario, notification_title, notification_body)
     if destinatario in active_clients:
         destinatario_socket = active_clients[destinatario]
@@ -236,44 +229,73 @@ def send_message(destinatario, message, remitente):
             message_queue.put((destinatario, message))
     else:
 
-
-
         # Si el destinatario no está conectado, almacenar el mensaje en la cola
         print("Destinatario desconectado. Almacenando mensaje en la cola.")
-        message_queue.put((destinatario, message,remitente))
+        message_queue.put((destinatario, message, remitente))
 
+def save_message(remitente, destinatario, mensaje):
+    try:
+        # Conectar a la base de datos
+        conn = pool.connection()
+
+    except Error as e:
+        print(f"Error al conectar a la base de datos: {e}")
+        return False
+
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute(
+                'INSERT INTO mensajes (remitente_nombre_usuario, destinatario_nombre_usuario, mensaje) VALUES (?, ?, ?)',
+        (remitente, destinatario, mensaje))
+        conn.commit()
+
+        print(f"Mensaje de {remitente} a {destinatario}: {mensaje}")
+
+    except mariadb.Error as e:
+        print(f"Error al registrar usuario: {e}")
+
+    finally:
+        if conn:
+            conn.close()
 # Función para agregar un cliente activo
 
 def add_active_client(nombre_usuario, client_socket):
     active_clients[nombre_usuario] = client_socket
+
 
 # Función para eliminar un cliente activo
 def remove_active_client(nombre_usuario):
     if nombre_usuario in active_clients:
         del active_clients[nombre_usuario]
 
+
 def process_message_queue():
     while True:
-        destinatario, message,remitente = message_queue.get()
+        destinatario, message, remitente = message_queue.get()
         print(f"QUEUE:Extrayendo mensaje de la cola para {destinatario}")
         if destinatario in active_clients:
-            print(f"QUEUE:Enviando mensaje a {destinatario} en dirección IP {active_clients[destinatario].getpeername()}")
-            send_message(destinatario, message,remitente)
+            print(
+                f"QUEUE:Enviando mensaje a {destinatario} en dirección IP {active_clients[destinatario].getpeername()}")
+            send_message(destinatario, message, remitente)
         else:
             print("QUEUE:Destinatario desconectado. Volviendo a encolar el mensaje.")
-            message_queue.put((destinatario, message,remitente))
+            message_queue.put((destinatario, message, remitente))
 
         # Agregar una pausa de 2 segundo para reducir el consumo de CPU
         time.sleep(2)
 
+
 # Iniciar el hilo para procesar mensajes pendientes
 message_thread = threading.Thread(target=process_message_queue)
 message_thread.start()
+
+
 def handle_client(client_socket, client_address):
-
-
     try:
-        print(f"Conexión establecida desde {client_address} el día: {datetime.now().strftime('%Y-%m-%d')} a las: {datetime.now().strftime('%H:%M')}")
+        # nota: si ves conexiones que desconoces conectandose a tu server probablemente sean escaneos de puertos abiertos.
+        print(
+            f"Conexión establecida desde {client_address} el día: {datetime.now().strftime('%Y-%m-%d')} a las: {datetime.now().strftime('%H:%M')}")
         nombre_usuario = None  # Inicializar la variable nombre_usuario
 
         try:
@@ -286,8 +308,10 @@ def handle_client(client_socket, client_address):
             if data.startswith("REGISTRAR:"):
                 # Manejar la solicitud de registro
                 _, nombre, apellido1, apellido2, nuevo_usuario, email, nueva_contrasena = data.split(":")
-                print(f"Solicitud de registro recibida: {nombre}, {apellido1}, {apellido2}, {nuevo_usuario}, {email}, {nueva_contrasena}")
-                registro_exitoso = registrar_usuario(nombre, apellido1, apellido2, nuevo_usuario, email, nueva_contrasena)
+                print(
+                    f"Solicitud de registro recibida: {nombre}, {apellido1}, {apellido2}, {nuevo_usuario}, {email}, {nueva_contrasena}")
+                registro_exitoso = registrar_usuario(nombre, apellido1, apellido2, nuevo_usuario, email,
+                                                     nueva_contrasena)
                 print(registro_exitoso)
                 if registro_exitoso:
                     client_socket.send(b"OK")
@@ -318,19 +342,8 @@ def handle_client(client_socket, client_address):
             if nombre_usuario is not None:
                 add_active_client(nombre_usuario, client_socket)
 
-
-
             while True:
                 try:
-                    conn = pool.connection()
-                    # Verifica y reconecta la conexión a la base de datos si es necesario
-                    if conn is None or not check_db_connection(conn):
-                        print("Reconectando a la base de datos...")
-                        if conn is not None:
-                            conn.close()
-                        conn = pool.connection()
-
-
                     # Utilizar select para monitorear los sockets para lectura, escritura y errores
                     read_sockets, _, _ = select.select([client_socket], [], [], 1)
 
@@ -345,28 +358,13 @@ def handle_client(client_socket, client_address):
                         remitente = remitente.rstrip().lower()
                         destinatario = destinatario.rstrip().lower()
 
-                        cursor.execute(
-                            'INSERT INTO mensajes (remitente_nombre_usuario, destinatario_nombre_usuario, mensaje) VALUES (?, ?, ?)',
-                            (remitente, destinatario, mensaje))
-                        conn.commit()
-
-                        print(f"Mensaje de {remitente} a {destinatario}: {mensaje}")
+                        save_message(remitente, destinatario, mensaje)
 
                         send_message(destinatario, message, remitente)
 
-                except ConnectionResetError as cre:
-                    print(f"Error de conexión con el cliente de envios y recepciones {client_address}: {cre}")
-                    break
-                except UnicodeDecodeError as ude:
-                    print(f"Error de decodificación de datos del cliente de envios y recepciones{client_address}: {ude}")
-                    break
-                except ValueError as ve:
-                    print(f"Error al procesar los datos del cliente de envios y recepciones{client_address}: {ve}")
-                    break
                 except Exception as e:
-                    print(f"Error en el manejo de mensajes del cliente de envios y recepciones: {e}")
+                    print(f"Error en el manejo de mensajes del cliente: {e}")
                     break
-
 
             while not message_queue.empty():
                 destinatario, message, remitente = message_queue.get()
@@ -382,20 +380,12 @@ def handle_client(client_socket, client_address):
 
         except ConnectionResetError as cre:
             print(f"Error de conexión con el cliente {client_address}: {cre}")
-            client_socket.send("ERROR: Error de conexión.".encode("utf-8"))
-
         except UnicodeDecodeError as ude:
             print(f"Error de decodificación de datos del cliente {client_address}: {ude}")
-            client_socket.send("ERROR: Error de conexión.".encode("utf-8"))
-
         except ValueError as ve:
             print(f"Error al procesar los datos del cliente {client_address}: {ve}")
-            client_socket.send("ERROR: Error de conexión.".encode("utf-8"))
-
         except Exception as e:
             print(f"Error en el manejo del cliente {client_address}: {e}")
-            client_socket.send("ERROR: Error de conexión.".encode("utf-8"))
-
 
     finally:
         if nombre_usuario is not None:
@@ -405,11 +395,17 @@ def handle_client(client_socket, client_address):
             client_socket.close()
 
 
-
 server_host = '0.0.0.0'
 server_port = 12345
 
-conn = pool.connection()
+conn=None
+# Crear una conexión a la base de datos
+try:
+    # Conectar a la base de datos
+    conn = pool.connection()
+
+except Error as e:
+    print(f"Error al conectar a la base de datos: {e}")
 
 # Crear el cursor para la base de datos
 cursor = conn.cursor()
@@ -453,9 +449,7 @@ server_socket.bind((server_host, server_port))
 # Escuchar conexiones entrantes (máximo 5 clientes en espera)
 server_socket.listen(5)
 
-
 print(f"Servidor escuchando en {server_host}:{server_port}")
-
 
 while True:
     # Aceptar conexiones entrantes
