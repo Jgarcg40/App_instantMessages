@@ -144,12 +144,20 @@ def registrar_usuario(nombre, apellido1, apellido2, nombre_usuario, email, contr
     cursor = conn.cursor()
 
     try:
-        # Verificar si el nombre de usuario ya existe en la base de datos
-        cursor.execute('SELECT nombre_usuario FROM usuarios WHERE nombre_usuario = %s', (nombre_usuario,))
-        user = cursor.fetchone()
-        print(user)
-        # Si el nombre de usuario ya existe, no se puede registrar de nuevo
-        if user:
+        # Consulta para verificar si el nombre de usuario ya existe.
+        consulta_existencia = "SELECT COUNT(*) FROM usuarios WHERE nombre_usuario = %s"
+
+
+        # Ejecutar la consulta con el nombre de usuario como parámetro.
+        cursor.execute(consulta_existencia, (nombre_usuario,))
+
+        # Obtener el resultado de la consulta.
+        resultado = cursor.fetchone()
+
+        # El resultado será una tupla con un solo valor que representa la cantidad de coincidencias.
+        # Si el valor es mayor que 0, significa que el nombre de usuario ya existe.
+        if resultado[0] > 0:
+            print("El nombre de usuario ya existe.")
             return False
 
         # Insertar el nuevo usuario en la base de datos
@@ -166,7 +174,6 @@ def registrar_usuario(nombre, apellido1, apellido2, nombre_usuario, email, contr
     finally:
         if conn:
             conn.close()
-
 
 def verificar_credenciales(nombre_usuario, contrasena):
     conn = None
@@ -363,7 +370,8 @@ def handle_client(client_socket, client_address):
                         send_message(destinatario, message, remitente)
 
                 except Exception as e:
-                    print(f"Error en el manejo de mensajes del cliente: {e}")
+                    #print(f"Error en el manejo de mensajes del cliente: {e}")
+                    #comentado porque envia demasiados mesnajes cada vez que se desconecta un host
                     break
 
             while not message_queue.empty():
